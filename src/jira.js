@@ -22,7 +22,9 @@ async function readJson(response, what) {
     const body = await response.text();
     throw new Error(`${what} failed: HTTP ${response.status} ${body.slice(0, 200)}`);
   }
-  return response.status === 204 ? null : response.json();
+  // Some Jira endpoints (e.g. PUT issue property) answer 200/201 with an EMPTY body, so parse only if there is text.
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 /** Reads the issue's key, summary, description (as text) and creation date. */
