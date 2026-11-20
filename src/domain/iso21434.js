@@ -67,6 +67,14 @@ export const DEFAULT_RESPONSE_POLICY = {
   1: { treatment: 'retain', triageDays: 20, remediationDays: null, label: 'Very low' },
 };
 
+/**
+ * True once the analyst has rated at least one impact category. Until then there is no risk value:
+ * showing "1/5" for an unrated report would make an unreviewed issue look safe.
+ */
+export function isImpactRated(impacts = {}) {
+  return IMPACT_CATEGORIES.some((c) => IMPACT_LEVELS.includes(impacts?.[c]));
+}
+
 /** Returns the worst impact level across the four categories. Unknown or missing values count as negligible. */
 export function overallImpact(impacts = {}) {
   let worst = 0;

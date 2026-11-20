@@ -9,6 +9,24 @@ modules:
       title: R155 Assessment
       icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
 
+  # Admin page (Jira settings > Apps): inventory import and settings. Writes are re-checked on the server.
+  jira:adminPage:
+    - key: r155-admin-page
+      resource: admin
+      resolver:
+        function: resolver
+      render: native
+      title: R155 Desk
+
+  # Internal first-look note on new tickets that name a component from the inventory.
+  trigger:
+    - key: r155-issue-created
+      function: issueCreated
+      events:
+        - avi:jira:created:issue
+      filter:
+        ignoreSelf: true
+
   # Rovo actions. Used by the agent below and exposed as MCP tools.
   action:
     - key: find-affected-assets
@@ -29,6 +47,11 @@ modules:
           type: string
           required: false
           description: Version range from the advisory, e.g. "<3.0.8" or ">=1.0 <1.2". Leave empty if unknown.
+        entryInterface:
+          title: Entry interface
+          type: string
+          required: false
+          description: How the issue is reached according to the report, e.g. "Wi-Fi", "Bluetooth", "cellular", "USB", "OBD", "CAN".
     - key: assess-cyber-risk
       name: Calculate ISO 21434 risk value
       function: assessRisk
@@ -77,7 +100,17 @@ modules:
         - find-affected-assets lists which ECUs, vehicle lines and markets use the named component, and how many vehicles.
         - assess-cyber-risk computes the ISO/SAE 21434 risk value and due dates. Do not compute the risk value yourself.
 
-        When you suggest impact ratings or feasibility factors, give a one-line reason for each.
+        Use the exposure in the results: "direct" means the ECU itself has the interface named in the report;
+        "indirect" means it is reachable only through other ECUs (the path is given). Base safety impact on what
+        a directly exposed ECU, or a realistic path, could affect, and say which ECU you mean.
+
+        The result includes suggestedFactors with reasons. Start from them and say where you differ and why.
+        Factor meanings (ISO/SAE 21434 Annex G): elapsed time = time to identify the weakness and build a working
+        attack, not the age of the report; expertise = skill needed; knowledge = how much non-public information
+        about the item is needed; window of opportunity = access needed (remote, nearby, physical, time limited);
+        equipment = tools needed.
+
+        When you suggest impact ratings, give a one-line reason for each.
         If the report is unclear, choose the more cautious rating and say that you did.
         Only report ECUs, versions and vehicle counts returned by the actions. If nothing matches, say so.
         You make recommendations; the analyst reviews and saves the assessment in the R155 Assessment panel.
@@ -110,15 +143,23 @@ modules:
       handler: index.assessRiskAction
     - key: getAssessment
       handler: index.getAssessmentAction
+    - key: issueCreated
+      handler: index.onIssueCreated
 
 resources:
   - key: main
     path: src/frontend/index.jsx
+  - key: admin
+    path: src/frontend/admin.jsx
 
 permissions:
   scopes:
     - read:jira-work
     - write:jira-work
+    - storage:app
+    - read:space:confluence
+    - read:page:confluence
+    - write:page:confluence
 
 app:
   runtime:
@@ -126,3 +167,8 @@ app:
     memoryMB: 256
     architecture: arm64
   id: ari:cloud:ecosystem::app/81583cce-a7c4-4bd0-a706-1b8c7d71f872
+  compatibility:
+    jira:
+      required: true
+    confluence:
+      required: false
