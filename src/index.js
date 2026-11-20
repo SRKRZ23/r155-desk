@@ -17,6 +17,7 @@ import {
 } from './jira.js';
 import { getInventory, getSettings, resetInventory, saveInventory, saveSettings } from './storage.js';
 import { publishAuditPage } from './confluence.js';
+import { onConnectionChange, rememberSiteLinks, syncInventoryToGraph } from './graph.js';
 
 const issueText = (issue) => `${issue.summary}\n${issue.description}`;
 
@@ -106,7 +107,14 @@ resolver.define('publishAudit', async ({ context }) => {
 });
 
 // Admin page -----------------------------------------------------------------------------------
-resolver.define('loadAdmin', async () => {
+resolver.define('loadAdmin', async ({ context }) => {
+  const appUuid = String(context.localId || '').match(/app\/([0-9a-f-]{36})/)?.[1];
+  if (context.siteUrl) {
+    await rememberSiteLinks({
+      siteUrl: context.siteUrl,
+      adminUrl: appUuid && context.environmentId ? `${context.siteUrl}/jira/settings/apps/${appUuid}/${context.environmentId}` : context.siteUrl,
+    });
+  }
   const [inventory, settings] = await Promise.all([getInventory(), getSettings()]);
   return { summary: inventorySummary(inventory), settings, csvTemplate: inventoryToCsv(DEMO_INVENTORY) };
 });
@@ -121,13 +129,15 @@ resolver.define('saveImport', async ({ payload }) => {
   const { inventory, problems } = importInventory(payload.text);
   if (!inventory) return { problems };
   await saveInventory(inventory);
-  return { problems: [], summary: inventorySummary(inventory) };
+  const graphSync = await syncInventoryToGraph();
+  return { problems: [], summary: inventorySummary(inventory), graphSync };
 });
 
 resolver.define('resetInventory', async () => {
   await requireAdmin();
   await resetInventory();
-  return { summary: inventorySummary(DEMO_INVENTORY) };
+  const graphSync = await syncInventoryToGraph();
+  return { summary: inventorySummary(DEMO_INVENTORY), graphSync };
 });
 
 resolver.define('saveSettings', async ({ payload }) => {
@@ -206,3 +216,8 @@ export async function onIssueCreated(event) {
     components: triage.components.map((c) => ({ component: c.component, affectedVersions: c.affectedVersions, affectedEcuCount: c.affectedEcuCount, fleetExposure: c.fleetExposure })),
   });
 }
+
+// ---------------------------------------------------------------------------------------------
+// Teamwork Graph connector lifecycle
+// ---------------------------------------------------------------------------------------------
+export { onConnectionChange as onGraphConnectionChange };

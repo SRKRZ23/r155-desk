@@ -49,3 +49,15 @@ test('audit page escapes HTML and contains the four ISO 21434 sections', () => {
   assert.match(html, /5\/5 \(Critical\)/);
   assert.match(html, /182,000/);
 });
+
+test('graph objects: one per ECU and per vehicle line, searchable text, stable ids', async () => {
+  const { inventoryToGraphObjects } = await import('../src/domain/graph-objects.js');
+  const objs = inventoryToGraphObjects(DEMO_INVENTORY, { baseUrl: 'https://x.atlassian.net/jira/settings/apps/a/b', updatedAt: '2026-11-21T00:00:00Z' });
+  assert.equal(objs.length, DEMO_INVENTORY.ecus.length + DEMO_INVENTORY.vehicleLines.length);
+  const ivi = objs.find((o) => o.id === 'ecu:IVI-2');
+  assert.match(ivi['atlassian:document'].content.text, /OpenSSL 3\.0\.7/);
+  assert.match(ivi['atlassian:document'].content.text, /Aurora S1/);
+  assert.equal(ivi.url, 'https://x.atlassian.net/jira/settings/apps/a/b#ecu-IVI-2');
+  assert.equal(new Set(objs.map((o) => o.id)).size, objs.length);
+  assert.equal(ivi.updateSequenceNumber, Date.parse('2026-11-21T00:00:00Z'));
+});

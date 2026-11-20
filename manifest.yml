@@ -126,6 +126,23 @@ modules:
         - find-affected-assets
         - assess-cyber-risk
 
+  # Teamwork Graph connector: puts the vehicle / ECU inventory into the graph for Rovo Search and Chat.
+  graph:connector:
+    - key: r155-inventory-connector
+      name: R155 Desk inventory
+      capabilities:
+        replicatesPermissions: false
+        syncFidelity: upsert
+        supportsIncrementalSync: false
+      icons:
+        light: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+        dark: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+      objectTypes:
+        - atlassian:document
+      datasource:
+        onConnectionChange:
+          function: graphConnectionChange
+
   rovo:mcp:
     - key: r155-desk-mcp
       name: R155 Desk
@@ -145,6 +162,8 @@ modules:
       handler: index.getAssessmentAction
     - key: issueCreated
       handler: index.onIssueCreated
+    - key: graphConnectionChange
+      handler: index.onGraphConnectionChange
 
 resources:
   - key: main
@@ -160,6 +179,9 @@ permissions:
     - read:space:confluence
     - read:page:confluence
     - write:page:confluence
+    - read:object:jira
+    - write:object:jira
+    - delete:object:jira
 
 app:
   runtime:
