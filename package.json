@@ -1,0 +1,18 @@
+{
+  "name": "r155-desk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Automotive vulnerability triage for UN R155 / ISO/SAE 21434 on Jira Service Management, with a Rovo agent and MCP tools.",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test test/*.test.mjs",
+    "lint": "../af lint"
+  },
+  "dependencies": {
+    "@forge/api": "8.5.0",
+    "@forge/bridge": "7.3.0",
+    "@forge/react": "12.5.0",
+    "@forge/resolver": "2.0.2",
+    "react": "^18.2.0"
+  }
+}

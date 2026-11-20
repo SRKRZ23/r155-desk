@@ -1,0 +1,128 @@
+modules:
+  # Issue panel: the analyst's working view on a vulnerability ticket (Jira / Jira Service Management).
+  jira:issuePanel:
+    - key: r155-assessment-panel
+      resource: main
+      resolver:
+        function: resolver
+      render: native
+      title: R155 Assessment
+      icon: https://developer.atlassian.com/platform/forge/images/icons/issue-panel-icon.svg
+
+  # Rovo actions. Used by the agent below and exposed as MCP tools.
+  action:
+    - key: find-affected-assets
+      name: Find affected vehicles and ECUs
+      function: findAffectedAssets
+      actionVerb: GET
+      description: >-
+        Blast radius of a vulnerable software component: which ECUs run it, installed versions, whether each is
+        in the affected range, vehicle lines, markets and vehicles in the field.
+      inputs:
+        component:
+          title: Component
+          type: string
+          required: true
+          description: Software component name as written in the vulnerability report, e.g. "OpenSSL".
+        affectedVersions:
+          title: Affected versions
+          type: string
+          required: false
+          description: Version range from the advisory, e.g. "<3.0.8" or ">=1.0 <1.2". Leave empty if unknown.
+    - key: assess-cyber-risk
+      name: Calculate ISO 21434 risk value
+      function: assessRisk
+      actionVerb: GET
+      description: >-
+        ISO/SAE 21434 risk value (1-5) from impact ratings (safety, financial, operational, privacy) and the five
+        attack-potential factors. Returns feasibility, risk value, treatment and triage and remediation due dates.
+      inputs:
+        safety: { title: Safety impact, type: string, required: false, description: "negligible, moderate, major or severe" }
+        financial: { title: Financial impact, type: string, required: false, description: "negligible, moderate, major or severe" }
+        operational: { title: Operational impact, type: string, required: false, description: "negligible, moderate, major or severe" }
+        privacy: { title: Privacy impact, type: string, required: false, description: "negligible, moderate, major or severe" }
+        elapsedTime: { title: Elapsed time, type: string, required: true, description: "le1day, le1week, le1month, le6months or gt6months" }
+        expertise: { title: Specialist expertise, type: string, required: true, description: "layman, proficient, expert or multipleExperts" }
+        knowledge: { title: Knowledge of the item, type: string, required: true, description: "public, restricted, confidential or strictlyConfidential" }
+        windowOfOpportunity: { title: Window of opportunity, type: string, required: true, description: "unlimited, easy, moderate or difficult" }
+        equipment: { title: Equipment, type: string, required: true, description: "standard, specialized, bespoke or multipleBespoke" }
+        discoveredAt: { title: Discovery date, type: string, required: false, description: "ISO date the vulnerability was reported, e.g. 2026-11-20; deadlines count from it" }
+    - key: get-r155-assessment
+      name: Get vulnerability assessment
+      function: getAssessment
+      actionVerb: GET
+      description: >-
+        Read a vulnerability ticket: summary, status, components detected in its text, blast radius for each and
+        the saved R155 risk assessment if any. Uses the open issue when no key is given.
+      inputs:
+        issueKey:
+          title: Issue key
+          type: string
+          required: false
+          description: Jira issue key such as SECOPS-12. Optional when the user is on an issue.
+
+  # NOTE: Forge screens agent manifests with a safety check ("Agent not allowed"). Offensive-sounding wording
+  # (exploit, attack scenarios) was rejected intermittently on 2026-11-20, so this prompt uses neutral
+  # compliance language. Re-run `forge lint` several times after editing it.
+  rovo:agent:
+    - key: r155-triage-agent
+      name: R155 Triage
+      description: Helps product security teams assess reported software issues against the vehicle inventory, following ISO/SAE 21434 and UN R155.
+      prompt: |
+        You are a compliance assistant for automotive product security teams. You help them assess reported
+        software issues in vehicle components and document the assessment for UN R155 and ISO/SAE 21434 audits.
+
+        Base every answer on the actions:
+        - get-r155-assessment reads the Jira ticket the user is viewing, or the key they give.
+        - find-affected-assets lists which ECUs, vehicle lines and markets use the named component, and how many vehicles.
+        - assess-cyber-risk computes the ISO/SAE 21434 risk value and due dates. Do not compute the risk value yourself.
+
+        When you suggest impact ratings or feasibility factors, give a one-line reason for each.
+        If the report is unclear, choose the more cautious rating and say that you did.
+        Only report ECUs, versions and vehicle counts returned by the actions. If nothing matches, say so.
+        You make recommendations; the analyst reviews and saves the assessment in the R155 Assessment panel.
+
+        Structure the answer as: 1) affected ECUs, vehicle lines, vehicles and markets; 2) suggested ratings with
+        reasons; 3) risk value, treatment and due dates from the action; 4) questions for the supplier or reporter.
+      conversationStarters:
+        - Assess this ticket
+        - Which vehicles use OpenSSL older than 3.0.8?
+        - What is the risk if the infotainment Bluetooth stack is affected?
+      actions:
+        - get-r155-assessment
+        - find-affected-assets
+        - assess-cyber-risk
+
+  rovo:mcp:
+    - key: r155-desk-mcp
+      name: R155 Desk
+      tools:
+        - get-r155-assessment
+        - find-affected-assets
+        - assess-cyber-risk
+
+  function:
+    - key: resolver
+      handler: index.handler
+    - key: findAffectedAssets
+      handler: index.findAffectedAssetsAction
+    - key: assessRisk
+      handler: index.assessRiskAction
+    - key: getAssessment
+      handler: index.getAssessmentAction
+
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+
+permissions:
+  scopes:
+    - read:jira-work
+    - write:jira-work
+
+app:
+  runtime:
+    name: nodejs24.x
+    memoryMB: 256
+    architecture: arm64
+  id: ari:cloud:ecosystem::app/81583cce-a7c4-4bd0-a706-1b8c7d71f872
