@@ -84,7 +84,7 @@ test('findAffectedAssets matches aliases case-insensitively', () => {
 test('detectComponents pulls component + range out of free text', () => {
   const found = detectComponents('Researcher report: heap overflow in OpenSSL before 3.0.8 reachable over Wi-Fi; also seen on QNX Neutrino 7.1');
   assert.deepEqual(found, [
-    { component: 'QNX Neutrino RTOS', affectedVersions: '=7.1' },
     { component: 'OpenSSL', affectedVersions: '<3.0.8' },
+    { component: 'QNX Neutrino RTOS', affectedVersions: '=7.1' },
   ]);
 });

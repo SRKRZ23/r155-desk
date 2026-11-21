@@ -256,26 +256,40 @@ export function findAffectedAssets({ component, affectedVersions, reportedInterf
 export function detectComponents(text, inventory = DEMO_INVENTORY) {
   const haystack = String(text || '');
   const lower = haystack.toLowerCase();
-  const seen = new Map();
+  const V = 'v?([0-9]+(?:\\.[0-9]+)+)';
+  // Version expression in the ~60 characters after a component name. Order matters: ranges first.
+  const versionAfter = (tail) => {
+    let m = tail.match(new RegExp(`^\\W{0,3}(?:versions?\\s+)?${V}\\s*(?:through|to|-|until)\\s*${V}`, 'i'));
+    if (m) return `>=${m[1]} <=${m[2]}`;
+    m = tail.match(new RegExp(`(?:before|prior to|<)\\s*${V}`, 'i'));
+    if (m) return `<${m[1]}`;
+    m = tail.match(new RegExp(`(?:through|up to|<=)\\s*${V}`, 'i'));
+    if (m) return `<=${m[1]}`;
+    m = tail.match(new RegExp(`^\\W{0,3}(?:versions?\\s+)?${V}`, 'i'));
+    if (m) return `=${m[1]}`;
+    return '';
+  };
+  const found = new Map();
   for (const ecu of inventory.ecus) {
     for (const c of ecu.components) {
+      if (found.get(c.name)?.affectedVersions) continue;
       for (const alias of [c.name, ...(c.aliases || [])]) {
-        const at = lower.indexOf(alias.toLowerCase());
-        if (at === -1 || seen.has(c.name)) continue;
-        // Look at the 40 characters after the name for a version expression.
-        const tail = haystack.slice(at + alias.length, at + alias.length + 40);
-        const before = tail.match(/(?:before|prior to|<)\s*v?([0-9]+(?:\.[0-9]+)+)/i);
-        const through = tail.match(/(?:through|up to|<=)\s*v?([0-9]+(?:\.[0-9]+)+)/i);
-        const exact = tail.match(/v?([0-9]+(?:\.[0-9]+)+)/);
-        let affectedVersions = '';
-        if (before) affectedVersions = `<${before[1]}`;
-        else if (through) affectedVersions = `<=${through[1]}`;
-        else if (exact) affectedVersions = `=${exact[1]}`;
-        seen.set(c.name, { component: c.name, affectedVersions });
+        const a = alias.toLowerCase();
+        // Every whole-word occurrence; keep the first one that carries a version.
+        for (let at = lower.indexOf(a); at !== -1; at = lower.indexOf(a, at + 1)) {
+          const before = lower[at - 1];
+          const after = lower[at + a.length];
+          if ((before && /[a-z0-9]/.test(before)) || (after && /[a-z0-9]/.test(after))) continue;
+          const affectedVersions = versionAfter(haystack.slice(at + a.length, at + a.length + 60));
+          if (!found.has(c.name) || (!found.get(c.name).affectedVersions && affectedVersions)) {
+            found.set(c.name, { component: c.name, affectedVersions, at });
+          }
+          if (affectedVersions) break;
+        }
       }
     }
   }
-  return [...seen.values()];
+  return [...found.values()].sort((x, y) => x.at - y.at).map(({ component, affectedVersions }) => ({ component, affectedVersions }));
 }
 
 // ---------------------------------------------------------------------------------------------

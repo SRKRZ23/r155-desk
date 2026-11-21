@@ -86,3 +86,13 @@ test('import rejects bad input with readable problems', () => {
   assert.ok(problems.some((p) => /no software components/.test(p)));
   assert.ok(problems.some((p) => /unknown ECU Y/.test(p)));
 });
+
+test('detectComponents: version found in a later mention, "A through B" becomes a closed range', async () => {
+  const { detectComponents, versionInRange } = await import('../src/domain/inventory.js');
+  const text = 'Supplier advisory: curl SOCKS5 heap overflow (CVE-2023-38545) in the telematics update client\nTier-1 B reports that the TCU-4 update client uses curl 7.69.0 through 8.3.0, affected by CVE-2023-38545.';
+  assert.deepEqual(detectComponents(text), [{ component: 'curl', affectedVersions: '>=7.69.0 <=8.3.0' }]);
+  assert.ok(versionInRange('7.88.1', '>=7.69.0 <=8.3.0'));
+  assert.ok(!versionInRange('8.4.0', '>=7.69.0 <=8.3.0'));
+  // "linux" inside another word is not a match; the CVE number is not a version
+  assert.deepEqual(detectComponents('Bug in mylinuxtool and CVE-2024-1234'), []);
+});
