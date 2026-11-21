@@ -64,6 +64,10 @@ export function triageCommentAdf(triage, inventory) {
 // ---------------------------------------------------------------------------------------------
 // Confluence audit record (storage format = XHTML)
 // ---------------------------------------------------------------------------------------------
+const FACTOR_TITLES = {
+  elapsedTime: 'Elapsed time', expertise: 'Specialist expertise', knowledge: 'Knowledge of the item',
+  windowOfOpportunity: 'Window of opportunity', equipment: 'Equipment',
+};
 const esc = (s) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** Audit record for one assessed issue, in Confluence storage format. */
@@ -71,8 +75,8 @@ export function auditPageStorage({ issue, siteUrl, assessment, history = [], inv
   const r = assessment.result;
   const b = assessment.blastRadius || {};
   const rows = (pairs) => pairs.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${v}</td></tr>`).join('');
-  const factorRows = Object.entries(assessment.factors || {}).map(([f, v]) => [f, esc(FACTOR_LABELS[f]?.[v] || v)]);
-  const impactRows = IMPACT_CATEGORIES.map((c) => [c, esc(assessment.impacts?.[c] || 'not rated')]);
+  const factorRows = Object.entries(assessment.factors || {}).map(([f, v]) => [FACTOR_TITLES[f] || f, esc(FACTOR_LABELS[f]?.[v] || v)]);
+  const impactRows = IMPACT_CATEGORIES.map((c) => [c[0].toUpperCase() + c.slice(1), esc(assessment.impacts?.[c] || 'not rated')]);
   const issueLink = siteUrl ? `<a href="${esc(`${siteUrl}/browse/${issue.key}`)}">${esc(issue.key)}</a>` : esc(issue.key);
   const exposureList = (b.exposure || []).map((e) => `<li><strong>${esc(e.ecuId)}</strong>: ${esc(e.note)}</li>`).join('');
   const historyRows = history.map((h) => `<tr><td>${esc(h.savedAt)}</td><td>${esc(h.result?.riskValue)}/5</td><td>${esc(h.result?.explanation)}</td></tr>`).join('');

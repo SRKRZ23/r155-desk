@@ -50,7 +50,6 @@ const App = () => {
 
   return (
     <Stack space="space.300">
-      <Heading size="large">R155 Desk</Heading>
       {message && <SectionMessage appearance={message.type}><Text>{message.text}</Text></SectionMessage>}
 
       <Stack space="space.150">
