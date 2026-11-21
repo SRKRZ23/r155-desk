@@ -199,22 +199,27 @@ export async function getAssessmentAction(payload) {
 // ---------------------------------------------------------------------------------------------
 export async function onIssueCreated(event) {
   const issueKey = event?.issue?.key;
+  console.log('r155 trigger: issue created', { issueKey, eventType: event?.eventType });
   if (!issueKey) return;
   const settings = await getSettings();
-  if (!settings.autoComment) return;
+  if (!settings.autoComment) return console.log('r155 trigger: auto-comment is off');
   const projectKey = event.issue.fields?.project?.key || issueKey.split('-')[0];
-  if (settings.projectKeys.length && !settings.projectKeys.includes(projectKey)) return;
-  if (await getAutoTriage(issueKey)) return; // already done (events can be delivered more than once)
+  if (settings.projectKeys.length && !settings.projectKeys.includes(projectKey)) {
+    return console.log('r155 trigger: project not selected', { projectKey, selected: settings.projectKeys });
+  }
+  if (await getAutoTriage(issueKey)) return console.log('r155 trigger: already triaged', { issueKey });
 
   const [issue, inventory] = await Promise.all([getIssue(issueKey, { asApp: true }), getInventory()]);
   const triage = triageText(issueText(issue), inventory);
-  if (!triage.components.some((c) => c.affectedEcuCount > 0 || c.ecus.length > 0)) return; // nothing we know about
-
+  if (!triage.components.some((c) => c.ecus.length > 0)) {
+    return console.log('r155 trigger: no known component in the text', { issueKey });
+  }
   await addInternalComment(issueKey, triageCommentAdf(triage, inventory));
   await setAutoTriage(issueKey, {
     at: new Date().toISOString(),
     components: triage.components.map((c) => ({ component: c.component, affectedVersions: c.affectedVersions, affectedEcuCount: c.affectedEcuCount, fleetExposure: c.fleetExposure })),
   });
+  console.log('r155 trigger: first-look note posted', { issueKey, components: triage.components.map((c) => c.component) });
 }
 
 // ---------------------------------------------------------------------------------------------
